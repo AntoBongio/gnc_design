@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "name": "Triton2 EVS",
+  "manufacturer": "LUCID Vision Labs",
+  "type": "event_camera",
+  "datasheet": "LUCID_Triton2-EVS-datasheet.pdf",
+  "frame": {
+    "convention": "ROS body: x forward (optical axis), y left, z up",
+    "origin": "Centre of the C-mount flange (front face of the housing); the lens barrel extends along +x."
+  },
+  "params": {
+    "focal_length_mm": { "label": "Lens focal length", "unit": "mm", "default": 8, "min": 1, "max": 100, "step": 0.5 },
+    "lens_length_mm": { "label": "Lens barrel length", "unit": "mm", "default": 30, "min": 0, "max": 200, "step": 1 },
+    "lens_diameter_mm": { "label": "Lens barrel diameter", "unit": "mm", "default": 30, "min": 10, "max": 100, "step": 1 }
+  },
+  "envelope": [
+    { "shape": "box", "size": [0.0453, 0.044, 0.029], "center": [-0.02265, 0, 0] },
+    {
+      "shape": "cylinder", "axis": "x",
+      "radius": "$lens_diameter_mm/2000", "length": "$lens_length_mm/1000",
+      "center": ["$lens_length_mm/2000", 0, 0],
+      "tag": "lens"
+    }
+  ],
+  "fov": {
+    "model": "pinhole",
+    "sensor_w_mm": 6.2208,
+    "sensor_h_mm": 3.4992,
+    "focal_length_mm": "$focal_length_mm",
+    "range_min_m": 0.05,
+    "range_max_m": 20
+  },
+  "defaultVariant": "TRT009S-EC",
+  "variants": [
+    {
+      "id": "TRT009S-EC",
+      "name": "TRT009S-EC · IMX636 1280x720",
+      "notes": "1/2.5\" sensor, 4.86 µm pixels → active area 6.22 x 3.50 mm. FoV depends on the C-mount lens."
+    },
+    {
+      "id": "TRT003S-EC",
+      "name": "TRT003S-EC · IMX637 640x512",
+      "fov": {
+        "model": "pinhole",
+        "sensor_w_mm": 3.1104,
+        "sensor_h_mm": 2.48832,
+        "focal_length_mm": "$focal_length_mm",
+        "range_min_m": 0.05,
+        "range_max_m": 20
+      },
+      "notes": "1/4.5\" sensor, 4.86 µm pixels → active area 3.11 x 2.49 mm."
+    }
+  ],
+  "sources": [
+    { "what": "Model table: resolution, sensor, pixel size 4.86 µm, C-mount", "page": 1 },
+    { "what": "Dimensions 44 x 29 x 45.3 mm (without lens barrel), weight 90 g", "page": 2 },
+    { "what": "Range is not specified in the datasheet; 20 m is a display default", "page": null }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "name": "ZED X",
+  "manufacturer": "Stereolabs",
+  "type": "stereo_camera",
+  "datasheet": "StereoLabs_ZED_X_Datasheet-3401328.pdf",
+  "frame": {
+    "convention": "ROS body: x forward (optical axis), y left, z up",
+    "origin": "Centre of the housing, midway between the two lenses (ZED camera_link convention)."
+  },
+  "envelope": [
+    { "shape": "box", "size": [0.0367, 0.1634, 0.0318], "center": [0, 0, 0] }
+  ],
+  "fov": {
+    "model": "frustum",
+    "hfov_deg": 110,
+    "vfov_deg": 80,
+    "range_min_m": 0.3,
+    "range_max_m": 20
+  },
+  "baseline_m": 0.12,
+  "defaultVariant": "zedx_2.2mm",
+  "variants": [
+    {
+      "id": "zedx_2.2mm",
+      "name": "ZED X · 2.2 mm",
+      "notes": "Max FoV 110°H x 80°V x 120°D, depth 0.3–20 m"
+    },
+    {
+      "id": "zedx_4mm",
+      "name": "ZED X · 4 mm",
+      "fov": { "model": "frustum", "hfov_deg": 80, "vfov_deg": 52, "range_min_m": 1, "range_max_m": 35 },
+      "notes": "Max FoV 80°H x 52°V x 91°D, depth 1–35 m"
+    },
+    {
+      "id": "zedx_mini_2.2mm",
+      "name": "ZED X Mini · 2.2 mm",
+      "envelope": [
+        { "shape": "box", "size": [0.0367, 0.0936, 0.0318], "center": [0, 0, 0] }
+      ],
+      "fov": { "model": "frustum", "hfov_deg": 110, "vfov_deg": 80, "range_min_m": 0.1, "range_max_m": 8 },
+      "baseline_m": 0.05
+    },
+    {
+      "id": "zedx_mini_4mm",
+      "name": "ZED X Mini · 4 mm",
+      "envelope": [
+        { "shape": "box", "size": [0.0367, 0.0936, 0.0318], "center": [0, 0, 0] }
+      ],
+      "fov": { "model": "frustum", "hfov_deg": 80, "vfov_deg": 52, "range_min_m": 0.15, "range_max_m": 12 },
+      "baseline_m": 0.05
+    }
+  ],
+  "sources": [
+    { "what": "Dimensions ZED X 163.4 x 31.8 x 36.7 mm, ZED X Mini 93.6 x 31.8 x 36.7 mm (W x H x D)", "page": 2 },
+    { "what": "Baseline 12 cm (ZED X), 5 cm (Mini)", "page": 2 },
+    { "what": "Field of view and depth range per lens", "page": 3 }
+  ]
+}

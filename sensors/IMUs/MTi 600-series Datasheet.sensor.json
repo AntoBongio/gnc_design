@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "name": "MTi 600-series",
+  "manufacturer": "Movella Xsens",
+  "type": "imu",
+  "datasheet": "MTi 600-series Datasheet.pdf",
+  "frame": {
+    "convention": "Sensor-fixed frame Sxyz, right-handed, z up out of the mounting face (Fig. 7/8)",
+    "origin": "Origin of measurements marked on the Section 7.1 drawings."
+  },
+  "envelope": [
+    { "shape": "box", "size": [0.0565, 0.0409, 0.03675], "center": [0.001, 0.00770, -0.011285], "tag": "housing" }
+  ],
+  "fov": null,
+  "defaultVariant": "mti-680g",
+  "variants": [
+    {
+      "id": "mti-680g",
+      "name": "MTi-680G (rugged housing)",
+      "notes": "Housing 56.5 (x) x 40.9 (y) x 36.75 (z) mm, connectors on the -x face. Origin 27.25 mm from the connector face, 12.75 mm from the -y side, 29.66 mm above the base. Base flange not modelled."
+    },
+    {
+      "id": "mti-600-module",
+      "name": "MTi-600 module (630/670/...)",
+      "envelope": [
+        { "shape": "box", "size": [0.0315, 0.028, 0.013], "center": [-0.0077, -0.0064, -0.00074], "tag": "module" }
+      ],
+      "notes": "Module 31.5 x 28 x 13 mm. Origin 8.05 mm from the +x edge, 7.60 mm from the +y edge, 7.24 mm above the bottom. Axis orientation on the top-view drawing assumed x right / y up: check against the label printed on the module."
+    }
+  ],
+  "sources": [
+    { "what": "Frames of reference, Fig. 7 (module) and Fig. 8 (MTi-680G)", "page": 27 },
+    { "what": "Dimensions and origin of measurements, Fig. 9 and Fig. 10", "page": 37 }
+  ]
+}
