@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sensor Placement Viewer</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">Sensor Placement Viewer</div>
+    <div id="robot-name" class="robot-name">no robot</div>
+    <div class="spacer"></div>
+    <div class="toolbar" id="view-buttons">
+      <button data-view="iso" title="Isometric view">Iso</button>
+      <button data-view="top" title="Top view (looking down -Z)">Top</button>
+      <button data-view="front" title="Front view (looking at the front face, -X)">Front</button>
+      <button data-view="side" title="Side view (looking from +Y)">Side</button>
+    </div>
+    <button id="btn-change-robot">Change robot</button>
+  </header>
+
+  <main id="layout">
+    <div id="viewport">
+      <div id="hud"></div>
+    </div>
+    <aside id="panel"></aside>
+  </main>
+
+  <dialog id="robot-picker">
+    <form method="dialog">
+      <h2>Select a robot</h2>
+      <p class="muted">Robot descriptions found in <code>robots/</code></p>
+      <ul id="robot-list" class="pick-list"></ul>
+      <div class="dialog-actions">
+        <button value="cancel" id="robot-picker-cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
