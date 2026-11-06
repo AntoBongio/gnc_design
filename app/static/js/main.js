@@ -4,7 +4,8 @@ import { api } from './api.js';
 import { loadRobot as parseRobot } from './robotLoader.js';
 import { pickBodyLink, localBounds, makeBodyFrame, makeFrontMarker, makeLinkFrames } from './robotFrames.js';
 import { PlacedSensor, resolveSpec, envelopeBounds } from './sensors.js';
-import { Panel } from './ui.js';
+import { Panel, h } from './ui.js';
+import { fovSettings, fovControls } from './fov.js';
 import { Gizmo } from './gizmo.js';
 
 const viewer = new Viewer(document.getElementById('viewport'));
@@ -26,6 +27,7 @@ const state = {
 const app = {
   state,
   viewer,
+  fovSettings,
 
   /** Add a sensor from a catalog entry. opts may carry a full pose. */
   addSensor(entry, opts = {}) {
@@ -95,6 +97,13 @@ const app = {
 
   /** Hook for derived visuals (footprints, occlusion) – replaced later. */
   sensorChanged() {},
+
+  cardExtras(sensor) { return fovControls(sensor, app, h); },
+
+  setMaxDisplayRange(v) {
+    fovSettings.maxDisplayRange = v;
+    for (const s of state.sensors) { s.rebuildFov(); s.emit('fov'); app.sensorChanged(s); }
+  },
 
   toggleAllFov() {
     const anyOn = state.sensors.some((s) => s.show.fov);

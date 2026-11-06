@@ -102,6 +102,11 @@ export class Panel {
           type: 'range', class: 'grow', min: 0.1, max: 1, step: 0.05, value: state.robotOpacity,
           oninput: (e) => this.app.setRobotOpacity(+e.target.value),
         })),
+      h('div', { class: 'row' }, h('label', { title: 'Default FoV range drawn for sensors without their own "Show range"' }, 'FoV range'),
+        h('input', {
+          type: 'number', min: 0.5, step: 1, value: this.app.fovSettings.maxDisplayRange, style: { width: '70px' },
+          onchange: (e) => { const v = +e.target.value; if (v > 0) this.app.setMaxDisplayRange(v); },
+        }), h('span', { class: 'muted' }, 'm (cap)')),
       h('div', { class: 'row' },
         checkbox('Link frames', state.showLinkFrames, (v) => this.app.setLinkFramesVisible(v)),
         checkbox('Body frame', state.showBodyFrame, (v) => this.app.setBodyFrameVisible(v)),

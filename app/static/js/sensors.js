@@ -210,6 +210,7 @@ export class PlacedSensor {
     if (this.buildFov) this.buildFov();
 
     this.applyVisibility();
+    this.emit('fov');
   }
 
   applyVisibility() {
