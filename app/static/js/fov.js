@@ -7,13 +7,17 @@
 import * as THREE from 'three';
 import { RAD, DEG } from './math.js';
 import { PlacedSensor } from './sensors.js';
+import { sampleFov, firstHit } from './analysis.js';
 
 export const fovSettings = {
   maxDisplayRange: 15,    // global cap [m] for sensors without their own display range
   opacity: 0.13,
   clipBelowGround: true,  // hide the part of FoV volumes under the ground plane
+  clipAtSurfaces: true,   // each FoV ray stops at the first robot/sensor surface (and the ground)
   groundPlane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0),   // z >= ground kept
 };
+
+const BLOCKED_COLOR = new THREE.Color(0xe0302a);
 
 function clipping() {
   return fovSettings.clipBelowGround ? [fovSettings.groundPlane] : null;
@@ -215,6 +219,116 @@ function buildSpinning(f, color, showChannels) {
 // ---------------------------------------------------------------------------
 // Hook into PlacedSensor
 
+// ---------------------------------------------------------------------------
+// Surface-clipped FoV: every sampled ray stops at the first obstacle (robot,
+// other sensors' envelopes) or at the ground. The result is the volume the
+// sensor really sees; the parts of the far surface lying on an obstacle are
+// tinted red.
+
+function clippedResolution(f) {
+  if (f.model === 'spinning') {
+    const span = Math.abs((f.azimuth_max_deg ?? 360) - (f.azimuth_min_deg ?? 0));
+    const nv = f.channels > 1 ? f.channels - 1 : Math.max(2, Math.ceil((f.elevation_max_deg - f.elevation_min_deg) / 1.5));
+    return [Math.max(8, Math.ceil(span / 1.5)), nv];
+  }
+  const clamp = THREE.MathUtils.clamp;
+  return [clamp(Math.ceil(f.hfov_deg / 2), 12, 72), clamp(Math.ceil(f.vfov_deg / 2), 8, 54)];
+}
+
+export function buildClippedFov(sensor, f, obstacles, groundZ) {
+  const [nu, nv] = clippedResolution(f);
+  const { rays } = sampleFov(f, nu, nv);
+  const N = rays.length;
+  sensor.mount.updateWorldMatrix(true, false);
+  const m = sensor.mount.matrixWorld;
+  const origin = new THREE.Vector3().setFromMatrixPosition(m);
+  const rot = new THREE.Matrix3().setFromMatrix4(m);
+  const base = new THREE.Color(sensor.color);
+
+  const pos = new Float32Array(2 * N * 3);    // far points [0, N), near points [N, 2N)
+  const col = new Float32Array(2 * N * 3);
+  const dw = new THREE.Vector3();
+  let wTotal = 0;
+  let wBlocked = 0;
+  let wGround = 0;
+  for (let k = 0; k < N; k++) {
+    const r = rays[k];
+    dw.copy(r.dir).applyMatrix3(rot).normalize();
+    let t = r.tmax;
+    let kind = 0;                              // 0 free, 1 obstacle, 2 ground
+    if (groundZ != null && dw.z < -1e-9) {
+      const tg = (groundZ - origin.z) / dw.z;
+      if (tg > 0 && tg < t) { t = tg; kind = 2; }
+    }
+    if (obstacles.length) {
+      const th = firstHit(origin, dw, obstacles, t);
+      if (th < t) { t = th; kind = 1; }
+    }
+    const tn = Math.min(r.tmin, t);
+    const c = kind === 1 ? BLOCKED_COLOR : base;
+    pos.set([r.dir.x * t, r.dir.y * t, r.dir.z * t], 3 * k);
+    pos.set([r.dir.x * tn, r.dir.y * tn, r.dir.z * tn], 3 * (N + k));
+    col.set([c.r, c.g, c.b], 3 * k);
+    col.set([c.r, c.g, c.b], 3 * (N + k));
+    wTotal += r.w;
+    if (kind === 1) wBlocked += r.w;
+    if (kind === 2) wGround += r.w;
+  }
+
+  const idx = [];
+  const id = (i, j) => j * (nu + 1) + i;
+  const hasNear = f.display_min_m > 1e-3;
+  for (let j = 0; j < nv; j++) {
+    for (let i = 0; i < nu; i++) {
+      const a = id(i, j); const b = id(i + 1, j); const c = id(i, j + 1); const d = id(i + 1, j + 1);
+      idx.push(a, b, d, a, d, c);
+      if (hasNear) idx.push(N + a, N + d, N + b, N + a, N + c, N + d);
+    }
+  }
+  // Boundary of the sampled domain: walls between near and far points.
+  const full = f.model === 'spinning'
+    && Math.abs((f.azimuth_max_deg ?? 360) - (f.azimuth_min_deg ?? 0)) >= 360 - 1e-6;
+  const boundaries = [
+    [...Array(nu + 1).keys()].map((i) => id(i, 0)),
+    [...Array(nu + 1).keys()].map((i) => id(i, nv)),
+  ];
+  if (!full) {
+    boundaries.push([...Array(nv + 1).keys()].map((j) => id(0, j)));
+    boundaries.push([...Array(nv + 1).keys()].map((j) => id(nu, j)));
+  }
+  for (const line of boundaries) {
+    for (let q = 0; q < line.length - 1; q++) {
+      const a = line[q]; const b = line[q + 1];
+      idx.push(N + a, N + b, b, N + a, b, a);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geom.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geom.setIndex(idx);
+  const mat = surfaceMaterial(0xffffff);
+  mat.vertexColors = true;
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.userData.fovSurface = true;
+  mesh.renderOrder = 5;
+
+  const g = new THREE.Group();
+  g.add(mesh);
+  // Outline: far-surface boundary (+ corner rays for cameras).
+  const lm = lineMaterial(sensor.color, 0.8);
+  const P = (k) => new THREE.Vector3(pos[3 * k], pos[3 * k + 1], pos[3 * k + 2]);
+  for (const line of boundaries) g.add(polyline(line.map(P), lm));
+  if (f.model === 'frustum') {
+    const corners = [id(0, 0), id(nu, 0), id(nu, nv), id(0, nv)];
+    g.add(segments(corners.map((k) => [P(N + k), P(k)]), lm));
+  }
+  return {
+    group: g,
+    stats: { blocked: wTotal ? wBlocked / wTotal : 0, ground: wTotal ? wGround / wTotal : 0 },
+  };
+}
+
 PlacedSensor.prototype.buildFov = function buildFov() {
   for (const c of [...this.fovGroup.children]) {
     this.fovGroup.remove(c);
@@ -222,7 +336,16 @@ PlacedSensor.prototype.buildFov = function buildFov() {
   }
   const f = effectiveFov(this);
   this.effectiveFov = f;
+  this.clipStats = null;
   if (!f) return;
+  if (fovSettings.clipAtSurfaces && this.obstacles && this.mount.parent) {
+    if (!this.show.fov || !this.mount.visible) return;    // rebuilt when shown again
+    const groundZ = fovSettings.clipBelowGround ? -fovSettings.groundPlane.constant : null;
+    const { group, stats } = buildClippedFov(this, f, this.obstacles(), groundZ);
+    this.fovGroup.add(group);
+    this.clipStats = stats;
+    return;
+  }
   if (f.model === 'frustum') {
     this.fovGroup.add(buildFrustum(f, this.color));
     if (this.type === 'stereo_camera' && this.show.eyes && this.resolved.baseline_m) {
@@ -304,6 +427,9 @@ export function fovControls(sensor, app, h) {
       parts.push(fp.area > 0
         ? `Ground: seen from ${fp.dMin.toFixed(2)} m to ${fp.dMax.toFixed(2)} m (horizontal from the sensor), area ${fp.area.toFixed(1)} m²`
         : 'Ground: not visible within the shown range');
+    }
+    if (sensor.clipStats) {
+      parts.push(`FoV obstructed: ${(sensor.clipStats.blocked * 100).toFixed(1)} % (red) · on ground: ${(sensor.clipStats.ground * 100).toFixed(1)} %`);
     }
     if (sensor.show.occlusion && d.occlusion) {
       parts.push(`Self-occlusion: ${(d.occlusion.fraction * 100).toFixed(1)} % of the FoV blocked by the robot (shown range)`);

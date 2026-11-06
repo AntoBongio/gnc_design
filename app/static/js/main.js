@@ -7,7 +7,7 @@ import { PlacedSensor, resolveSpec, envelopeBounds } from './sensors.js';
 import { Panel, h } from './ui.js';
 import { fovSettings, fovControls } from './fov.js';
 import { Gizmo } from './gizmo.js';
-import { computeFootprint, computeOcclusion } from './analysis.js';
+import { computeFootprint, computeOcclusion, obstacleMeshes } from './analysis.js';
 import { disposeTree } from './viewer.js';
 import { layoutSection, openSpecEditor, applyLayout } from './io.js';
 import { exportControls } from './exporters.js';
@@ -46,6 +46,7 @@ const app = {
       ...opts, name, parentLink, xyz, rpy,
       frameSize: sensorFrameSize(),
     });
+    sensor.obstacles = () => obstacleMeshes(state, sensor);
     sensor.on((what) => { if (what === 'pose') app.sensorChanged(sensor); });
     linkObj.add(sensor.mount);
     state.sensors.push(sensor);
@@ -101,13 +102,25 @@ const app = {
 
   /** Recompute derived visuals (ground footprint, occlusion) on the next frame. */
   sensorChanged(sensor) {
-    if (sensor) dirty.add(sensor);
-    else for (const s of state.sensors) dirty.add(s);
+    if (!sensor) { for (const s of state.sensors) dirty.add(s); return; }
+    dirty.add(sensor);
+    // A moved sensor can block the others: refresh them once it settles.
+    clearTimeout(othersTimer);
+    othersTimer = setTimeout(() => {
+      for (const s of state.sensors) if (s !== sensor) dirty.add(s);
+    }, 250);
+  },
+
+  setClipAtSurfaces(v) {
+    fovSettings.clipAtSurfaces = v;
+    for (const s of state.sensors) s.rebuildFov();
+    app.sensorChanged(null);
   },
 
   setClipBelowGround(v) {
     fovSettings.clipBelowGround = v;
     for (const s of state.sensors) s.rebuildFov();
+    app.sensorChanged(null);
   },
 
   cardExtras(sensor) { return fovControls(sensor, app, h); },
@@ -151,6 +164,7 @@ const app = {
 // Derived visuals, recomputed at most once per frame per sensor
 
 const dirty = new Set();
+let othersTimer = null;
 viewer.onFrame.push(() => {
   if (!dirty.size || !state.robot) return;
   for (const s of dirty) updateDerived(s);
@@ -170,13 +184,14 @@ function updateDerived(s) {
   }
   for (const c of [...s.derivedGroup.children]) { s.derivedGroup.remove(c); disposeTree(c); }
   s.derived = {};
+  if (fovSettings.clipAtSurfaces) s.rebuildFov();     // FoV depends on the world pose
   const visible = s.mount.visible && s.show.fov;
   if (visible && s.show.footprint) {
-    s.derived.footprint = computeFootprint(s, state.robot, state.groundZ);
+    s.derived.footprint = computeFootprint(s, obstacleMeshes(state, s), state.groundZ);
     if (s.derived.footprint?.mesh) s.derivedGroup.add(s.derived.footprint.mesh);
   }
   if (visible && s.show.occlusion) {
-    s.derived.occlusion = computeOcclusion(s, state.robot);
+    s.derived.occlusion = computeOcclusion(s, obstacleMeshes(state, s));
     if (s.derived.occlusion?.lines) s.derivedGroup.add(s.derived.occlusion.lines);
   }
   s.emit('derived');

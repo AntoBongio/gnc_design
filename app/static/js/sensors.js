@@ -214,6 +214,8 @@ export class PlacedSensor {
   }
 
   applyVisibility() {
+    if (this.hidden) { setVisible(this.mount, false); return; }
+    this.mount.visible = true;
     setVisible(this.envelope, this.show.envelope);
     setVisible(this.frame, this.show.frame);
     if (this.show.frame && !this.show.label) {
@@ -224,8 +226,8 @@ export class PlacedSensor {
   }
 
   setHidden(hidden) {
-    setVisible(this.mount, !hidden);
-    if (!hidden) this.applyVisibility();
+    this.hidden = hidden;
+    this.applyVisibility();
   }
 
   // ---- pose ---------------------------------------------------------------

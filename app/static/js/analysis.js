@@ -44,9 +44,22 @@ export function sampleFov(f, nu, nv) {
   return { nu, nv, rays };
 }
 
-function robotMeshes(robot) {
+/**
+ * Surfaces that can block a sensor: the robot visuals and the envelopes of
+ * the other (visible) sensors.
+ */
+export function obstacleMeshes(state, sensor) {
   const out = [];
-  robot.root.traverse((o) => { if (o.isMesh && o.userData.robotVisual) out.push(o); });
+  state.robot.root.traverse((o) => {
+    if (!o.isMesh || !o.visible) return;
+    if (o.userData.robotVisual) out.push(o);
+    else if (o.userData.sensorEnvelope) {
+      let p = o.parent;
+      while (p && !p.userData.sensor) p = p.parent;
+      const owner = p?.userData.sensor;
+      if (owner && owner !== sensor && owner.mount.visible && owner.envelope.visible) out.push(o);
+    }
+  });
   return out;
 }
 
@@ -62,7 +75,7 @@ function worldRays(sensor, sample) {
 }
 
 /** Distance to the first robot surface along a ray (Infinity if none). */
-function firstHit(origin, dir, meshes, far) {
+export function firstHit(origin, dir, meshes, far) {
   raycaster.set(origin, dir);
   raycaster.near = 1e-4;
   raycaster.far = far;
@@ -73,13 +86,12 @@ function firstHit(origin, dir, meshes, far) {
 // ---------------------------------------------------------------------------
 // Ground footprint
 
-export function computeFootprint(sensor, robot, groundZ) {
+export function computeFootprint(sensor, meshes, groundZ) {
   const f = sensor.effectiveFov;
   if (!f) return null;
   const [nu, nv] = f.model === 'spinning' ? [180, 120] : [80, 60];
   const sample = sampleFov(f, nu, nv);
   const { origin, dirs } = worldRays(sensor, sample);
-  const meshes = robotMeshes(robot);
   const pts = new Array(sample.rays.length).fill(null);
   let dMin = Infinity;
   let dMax = 0;
@@ -128,13 +140,12 @@ export function computeFootprint(sensor, robot, groundZ) {
 // ---------------------------------------------------------------------------
 // Self-occlusion
 
-export function computeOcclusion(sensor, robot) {
+export function computeOcclusion(sensor, meshes) {
   const f = sensor.effectiveFov;
   if (!f) return null;
   const [nu, nv] = f.model === 'spinning' ? [144, f.channels ? f.channels - 1 : 24] : [32, 24];
   const sample = sampleFov(f, nu, nv);
   const { origin, dirs } = worldRays(sensor, sample);
-  const meshes = robotMeshes(robot);
   const seg = [];
   let blocked = 0;
   let total = 0;

@@ -41,6 +41,10 @@ robot picker.
   - S: snap to 1 cm / 5°
   - F: focus on the selected sensor
   - Esc: deselect
+- **True FoV.** With *FoV stops at surfaces* on (the default), each FoV ray
+  ends at the first surface it hits: the robot, another sensor's envelope or
+  the ground. The volume then shows what the sensor really sees. Parts ending
+  on an obstacle are red, and the sensor card reports the obstructed fraction.
 - **FoV.** Each sensor's FoV is drawn from its spec. A pinhole FoV (event
   camera) follows the lens focal length you enter. *Show range* limits how far
   the volume is drawn; the datasheet range is kept for exports. A LiDAR can be

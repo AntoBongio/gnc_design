@@ -114,7 +114,9 @@ export class Panel {
         checkbox('Body frame', state.showBodyFrame, (v) => this.app.setBodyFrameVisible(v)),
         checkbox('Grid', true, (v) => { this.app.viewer.grid.visible = v; }),
         checkbox('Clip FoV at ground', this.app.fovSettings.clipBelowGround, (v) => this.app.setClipBelowGround(v),
-          'Hide the parts of FoV volumes below the ground plane')),
+          'Hide the parts of FoV volumes below the ground plane'),
+        checkbox('FoV stops at surfaces', this.app.fovSettings.clipAtSurfaces, (v) => this.app.setClipAtSurfaces(v),
+          'Each FoV ray ends at the first surface it hits (robot, other sensors, ground): shows the real visible volume; obstructed parts are red')),
     );
   }
 
