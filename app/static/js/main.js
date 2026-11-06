@@ -9,6 +9,7 @@ import { fovSettings, fovControls } from './fov.js';
 import { Gizmo } from './gizmo.js';
 import { computeFootprint, computeOcclusion } from './analysis.js';
 import { disposeTree } from './viewer.js';
+import { layoutSection, openSpecEditor, applyLayout } from './io.js';
 
 const viewer = new Viewer(document.getElementById('viewport'));
 const state = {
@@ -329,12 +330,20 @@ async function loadRobot(path) {
 
   document.getElementById('robot-name').textContent =
     `${robot.name} · ${robot.links.size} links · ${path}`;
-  history.replaceState(null, '', `?robot=${encodeURIComponent(path)}`);
+  state.layoutName = null;
+  updateUrl();
   hud.textContent = robot.warnings.length ? `⚠ ${robot.warnings.join(' · ')}` : '';
   for (const w of robot.warnings) console.warn(w);
 
   await refreshCatalog();
   viewer.setView('iso');
+}
+
+function updateUrl() {
+  const q = new URLSearchParams();
+  if (state.robotPath) q.set('robot', state.robotPath);
+  if (state.layoutName) q.set('layout', state.layoutName);
+  history.replaceState(null, '', `?${q}`);
 }
 
 async function refreshCatalog() {
@@ -347,10 +356,33 @@ async function refreshCatalog() {
   panel.render();
 }
 
-// ?robot=robots/xyz.sdf skips the picker (the URL is updated on every load).
-const initialRobot = new URLSearchParams(location.search).get('robot');
-if (initialRobot) loadRobot(initialRobot);
-else openRobotPicker();
+app.loadRobot = loadRobot;
+app.refreshCatalog = refreshCatalog;
+app.updateUrl = updateUrl;
+app.panel = panel;
+app.layoutSection = () => layoutSection(app);
+app.openSpecEditor = (entry) => openSpecEditor(app, entry);
+
+// ?robot=robots/xyz.sdf skips the picker; ?layout=name restores a saved layout.
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const robotPath = q.get('robot');
+  const layoutName = q.get('layout');
+  if (layoutName) {
+    try {
+      const layout = await api.loadLayout(layoutName);
+      await loadRobot(layout.robot || robotPath);
+      state.layoutName = layoutName;
+      await applyLayout(app, layout);
+      updateUrl();
+      return;
+    } catch (err) {
+      console.error(`layout ${layoutName}:`, err);
+    }
+  }
+  if (robotPath) loadRobot(robotPath);
+  else openRobotPicker();
+})();
 
 window.app = app;         // handy for debugging from the console
 window.viewer = viewer;

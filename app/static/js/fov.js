@@ -319,11 +319,12 @@ export function fovControls(sensor, app, h) {
       h('input', { type: 'checkbox', checked: sensor.show.occlusion, onchange: (e) => { sensor.show.occlusion = e.target.checked; app.sensorChanged(sensor); } }),
       ' Self-occlusion')));
   rows.push(stats);
-  sensor.on((what) => { if (what === 'derived') derived(); });
+  const offs = [sensor.on((what) => { if (what === 'derived') derived(); })];
   derived();
 
   const wrap = h('div', {}, info, ...rows);
   refresh();
-  sensor.on((what) => { if (what === 'fov') refresh(); });
+  offs.push(sensor.on((what) => { if (what === 'fov') refresh(); }));
+  wrap.dispose = () => offs.forEach((off) => off());
   return wrap;
 }

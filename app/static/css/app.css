@@ -158,3 +158,8 @@ dialog h2 { margin: 0 0 4px; font-size: 16px; }
 }
 .gizmo-bar[hidden] { display: none; }
 .check { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; cursor: pointer; }
+textarea {
+  font: inherit; color: var(--text); background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 6px; resize: vertical;
+}
+dialog.spec-dialog { width: min(680px, 94vw); max-width: none; }

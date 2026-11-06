@@ -77,11 +77,13 @@ export class Panel {
 
   render() {
     const { state } = this.app;
+    for (const card of this.cards.values()) card.unsubscribe();
     this.root.innerHTML = '';
     this.cards.clear();
     if (!state.robot) return;
     this.root.append(
       this.robotSection(),
+      this.app.layoutSection ? this.app.layoutSection() : '',
       this.catalogSection(),
       this.sensorsSection(),
     );
@@ -365,7 +367,7 @@ export class Panel {
     });
     refreshPose();
     refreshInfo();
-    return { el, refreshPose, unsubscribe };
+    return { el, refreshPose, unsubscribe: () => { unsubscribe(); extra?.dispose?.(); } };
   }
 }
 
