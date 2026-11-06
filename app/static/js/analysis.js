@@ -74,13 +74,29 @@ function worldRays(sensor, sample) {
   return { origin, dirs: sample.rays.map((r) => r.dir.clone().applyMatrix3(rot).normalize()) };
 }
 
-/** Distance to the first robot surface along a ray (Infinity if none). */
+/**
+ * Distance to the first obstacle surface along a ray (Infinity if none).
+ * Surfaces count from both sides: three.js culls back faces for FrontSide
+ * materials, so a ray starting inside a body (sensor mounted inside the
+ * rover) would otherwise pass straight through its walls.
+ */
 export function firstHit(origin, dir, meshes, far) {
   raycaster.set(origin, dir);
   raycaster.near = 1e-4;
   raycaster.far = far;
-  const hit = raycaster.intersectObjects(meshes, false)[0];
-  return hit ? hit.distance : Infinity;
+  const saved = [];
+  for (const m of meshes) {
+    for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+      saved.push(mat, mat.side);
+      mat.side = THREE.DoubleSide;
+    }
+  }
+  try {
+    const hit = raycaster.intersectObjects(meshes, false)[0];
+    return hit ? hit.distance : Infinity;
+  } finally {
+    for (let i = 0; i < saved.length; i += 2) saved[i].side = saved[i + 1];
+  }
 }
 
 // ---------------------------------------------------------------------------
