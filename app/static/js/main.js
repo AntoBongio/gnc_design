@@ -10,6 +10,7 @@ import { Gizmo } from './gizmo.js';
 import { computeFootprint, computeOcclusion } from './analysis.js';
 import { disposeTree } from './viewer.js';
 import { layoutSection, openSpecEditor, applyLayout } from './io.js';
+import { exportControls } from './exporters.js';
 
 const viewer = new Viewer(document.getElementById('viewport'));
 const state = {
@@ -361,6 +362,7 @@ app.refreshCatalog = refreshCatalog;
 app.updateUrl = updateUrl;
 app.panel = panel;
 app.layoutSection = () => layoutSection(app);
+app.exportControls = () => exportControls(app);
 app.openSpecEditor = (entry) => openSpecEditor(app, entry);
 
 // ?robot=robots/xyz.sdf skips the picker; ?layout=name restores a saved layout.

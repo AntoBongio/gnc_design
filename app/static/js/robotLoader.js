@@ -285,6 +285,7 @@ async function parseSDF(doc, robotPath) {
       if (!obj) continue;
       const holder = new THREE.Group();
       holder.name = visualEl.getAttribute('name') || 'visual';
+      holder.userData.visual = { geom, rgba: [color.r, color.g, color.b, opacity] };
       const vp = sdfPose(visualEl);
       // Visual poses default to the link frame; relative_to another frame is
       // expressed in model frame and brought back into link coordinates.
@@ -299,12 +300,18 @@ async function parseSDF(doc, robotPath) {
     }
   }
 
-  const joints = children(model, 'joint').map((el) => ({
-    name: el.getAttribute('name'),
-    type: el.getAttribute('type'),
-    parent: text(el, 'parent'),
-    child: text(el, 'child'),
-  }));
+  const joints = children(model, 'joint').map((el) => {
+    const axisEl = child(el, 'axis');
+    const limit = child(axisEl, 'limit');
+    return {
+      name: el.getAttribute('name'),
+      type: el.getAttribute('type'),
+      parent: text(el, 'parent'),
+      child: text(el, 'child'),
+      axis: parseNumbers(text(axisEl, 'xyz'), null),
+      limit: limit ? { lower: +text(limit, 'lower', 0), upper: +text(limit, 'upper', 0) } : null,
+    };
+  });
   const childSet = new Set(joints.map((j) => j.child));
   const rootLink = [...links.keys()].find((n) => !childSet.has(n)) || [...links.keys()][0];
 
@@ -374,11 +381,12 @@ async function parseURDF(doc, robotPath) {
     links.set(name, linkObj);
     for (const visualEl of children(linkEl, 'visual')) {
       const { color, opacity } = urdfColor(visualEl, namedMaterials);
-      const obj = await buildGeometry(
-        urdfGeometry(child(visualEl, 'geometry')), makeMaterial(color, opacity), robotPath, warnings);
+      const geom = urdfGeometry(child(visualEl, 'geometry'));
+      const obj = await buildGeometry(geom, makeMaterial(color, opacity), robotPath, warnings);
       if (!obj) continue;
       const holder = new THREE.Group();
       holder.name = visualEl.getAttribute('name') || 'visual';
+      holder.userData.visual = { geom, rgba: [color.r, color.g, color.b, opacity] };
       setObjectMatrix(holder, urdfOrigin(visualEl));
       holder.add(obj);
       markVisual(holder, name);
@@ -394,6 +402,10 @@ async function parseURDF(doc, robotPath) {
       parent: child(el, 'parent')?.getAttribute('link'),
       child: child(el, 'child')?.getAttribute('link'),
       origin: urdfOrigin(el),
+      axis: parseNumbers(child(el, 'axis')?.getAttribute('xyz'), null),
+      limit: child(el, 'limit')
+        ? { lower: +(child(el, 'limit').getAttribute('lower') || 0), upper: +(child(el, 'limit').getAttribute('upper') || 0) }
+        : null,
     };
     joints.push(j);
   }

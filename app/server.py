@@ -213,6 +213,8 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_error_json(HTTPStatus.BAD_REQUEST, f"bad file {fname!r}")
             out_dir.mkdir(parents=True, exist_ok=True)
             for fname, content in files.items():
+                # Mesh paths in generated URDFs use a placeholder for the project root.
+                content = content.replace("__PROJECT_ROOT__", ROOT.as_posix())
                 (out_dir / fname).write_text(content)
                 written.append((out_dir / fname).relative_to(ROOT).as_posix())
             return self.send_json({"dir": out_dir.relative_to(ROOT).as_posix(), "files": written})
