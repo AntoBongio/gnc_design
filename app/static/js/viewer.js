@@ -128,6 +128,15 @@ export class Viewer {
   }
 }
 
+/**
+ * Show/hide an object including its CSS2D labels (CSS2DRenderer only looks at
+ * each label's own `visible` flag, not at its ancestors).
+ */
+export function setVisible(obj, visible) {
+  obj.visible = visible;
+  obj.traverse((o) => { if (o.isCSS2DObject) o.visible = visible; });
+}
+
 export function disposeTree(obj) {
   obj.traverse((o) => {
     if (o.geometry) o.geometry.dispose();

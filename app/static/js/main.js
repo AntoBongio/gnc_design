@@ -1,6 +1,8 @@
-import { Viewer } from './viewer.js';
+import { Viewer, setVisible } from './viewer.js';
 import { api } from './api.js';
 import { loadRobot as parseRobot } from './robotLoader.js';
+import { pickBodyLink, localBounds, makeBodyFrame, makeFrontMarker, makeLinkFrames } from './robotFrames.js';
+import * as THREE from 'three';
 
 const viewer = new Viewer(document.getElementById('viewport'));
 const state = { robotPath: null, robot: null };
@@ -64,12 +66,27 @@ async function loadRobot(path) {
   viewer.content.add(robot.root);
   state.robotPath = path;
   state.robot = robot;
+
+  // Body frame (X forward), front-face marker and per-link frames.
+  robot.bodyLink = pickBodyLink(robot);
+  const bodyObj = robot.links.get(robot.bodyLink);
+  robot.bodyBounds = localBounds(bodyObj);
+  if (robot.bodyBounds.isEmpty()) robot.bodyBounds.set(new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, 0.5, 0.5));
+  bodyObj.add(makeBodyFrame(robot.bodyLink, robot.bodyBounds));
+  bodyObj.add(makeFrontMarker(robot.bodyBounds));
+  robot.linkFrames = makeLinkFrames(robot, Math.max(robot.bodyBounds.getSize(new THREE.Vector3()).length() * 0.04, 0.1));
+  for (const f of robot.linkFrames) setVisible(f, false);
+
   document.getElementById('robot-name').textContent =
     `${robot.name} · ${robot.links.size} links · ${path}`;
+  history.replaceState(null, '', `?robot=${encodeURIComponent(path)}`);
   hud.textContent = robot.warnings.length ? `⚠ ${robot.warnings.join(' · ')}` : '';
   for (const w of robot.warnings) console.warn(w);
   viewer.setView('iso');
 }
 
-openRobotPicker();
+// ?robot=robots/xyz.sdf skips the picker (the URL is updated on every load).
+const initialRobot = new URLSearchParams(location.search).get('robot');
+if (initialRobot) loadRobot(initialRobot);
+else openRobotPicker();
 window.viewer = viewer;   // handy for debugging from the console
