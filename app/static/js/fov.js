@@ -11,7 +11,13 @@ import { PlacedSensor } from './sensors.js';
 export const fovSettings = {
   maxDisplayRange: 15,    // global cap [m] for sensors without their own display range
   opacity: 0.13,
+  clipBelowGround: true,  // hide the part of FoV volumes under the ground plane
+  groundPlane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0),   // z >= ground kept
 };
+
+function clipping() {
+  return fovSettings.clipBelowGround ? [fovSettings.groundPlane] : null;
+}
 
 const MAX_CAMERA_FOV = 170;   // a planar frustum cannot represent >= 180°
 
@@ -73,12 +79,12 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 function surfaceMaterial(color) {
   return new THREE.MeshBasicMaterial({
     color, transparent: true, opacity: fovSettings.opacity,
-    side: THREE.DoubleSide, depthWrite: false,
+    side: THREE.DoubleSide, depthWrite: false, clippingPlanes: clipping(),
   });
 }
 
 function lineMaterial(color, opacity = 0.75) {
-  return new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
+  return new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false, clippingPlanes: clipping() });
 }
 
 function polyline(points, material, closed = false) {
@@ -289,6 +295,33 @@ export function fovControls(sensor, app, h) {
       input.value = f[key];
     }
   }
+  const stats = h('div', { class: 'summary' });
+  const derived = () => {
+    const d = sensor.derived || {};
+    const parts = [];
+    if (sensor.show.footprint && d.footprint) {
+      const fp = d.footprint;
+      parts.push(fp.area > 0
+        ? `Ground: seen from ${fp.dMin.toFixed(2)} m to ${fp.dMax.toFixed(2)} m (horizontal from the sensor), area ${fp.area.toFixed(1)} m²`
+        : 'Ground: not visible within the shown range');
+    }
+    if (sensor.show.occlusion && d.occlusion) {
+      parts.push(`Self-occlusion: ${(d.occlusion.fraction * 100).toFixed(1)} % of the FoV blocked by the robot (shown range)`);
+    }
+    stats.textContent = parts.join('\n');
+    stats.style.whiteSpace = 'pre-line';
+  };
+  rows.push(h('div', { class: 'row', style: { gap: '10px', flexWrap: 'wrap' } },
+    h('label', { class: 'check', title: 'Area of ground (z = lowest robot point) inside the shown FoV, minus what the robot hides' },
+      h('input', { type: 'checkbox', checked: sensor.show.footprint, onchange: (e) => { sensor.show.footprint = e.target.checked; app.sensorChanged(sensor); } }),
+      ' Ground footprint'),
+    h('label', { class: 'check', title: 'Rays blocked by the robot body are drawn in red' },
+      h('input', { type: 'checkbox', checked: sensor.show.occlusion, onchange: (e) => { sensor.show.occlusion = e.target.checked; app.sensorChanged(sensor); } }),
+      ' Self-occlusion')));
+  rows.push(stats);
+  sensor.on((what) => { if (what === 'derived') derived(); });
+  derived();
+
   const wrap = h('div', {}, info, ...rows);
   refresh();
   sensor.on((what) => { if (what === 'fov') refresh(); });

@@ -107,10 +107,12 @@ export class Panel {
           type: 'number', min: 0.5, step: 1, value: this.app.fovSettings.maxDisplayRange, style: { width: '70px' },
           onchange: (e) => { const v = +e.target.value; if (v > 0) this.app.setMaxDisplayRange(v); },
         }), h('span', { class: 'muted' }, 'm (cap)')),
-      h('div', { class: 'row' },
+      h('div', { class: 'row', style: { flexWrap: 'wrap', gap: '4px 12px' } },
         checkbox('Link frames', state.showLinkFrames, (v) => this.app.setLinkFramesVisible(v)),
         checkbox('Body frame', state.showBodyFrame, (v) => this.app.setBodyFrameVisible(v)),
-        checkbox('Grid', true, (v) => { this.app.viewer.grid.visible = v; })),
+        checkbox('Grid', true, (v) => { this.app.viewer.grid.visible = v; }),
+        checkbox('Clip FoV at ground', this.app.fovSettings.clipBelowGround, (v) => this.app.setClipBelowGround(v),
+          'Hide the parts of FoV volumes below the ground plane')),
     );
   }
 
@@ -220,6 +222,7 @@ export class Panel {
           e.stopPropagation();
           s.hidden = !s.hidden;
           s.setHidden(s.hidden);
+          app.sensorChanged(s);
           e.target.textContent = s.hidden ? 'show' : 'hide';
         },
       }, 'hide'));

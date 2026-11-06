@@ -7,6 +7,8 @@ import { PlacedSensor, resolveSpec, envelopeBounds } from './sensors.js';
 import { Panel, h } from './ui.js';
 import { fovSettings, fovControls } from './fov.js';
 import { Gizmo } from './gizmo.js';
+import { computeFootprint, computeOcclusion } from './analysis.js';
+import { disposeTree } from './viewer.js';
 
 const viewer = new Viewer(document.getElementById('viewport'));
 const state = {
@@ -95,8 +97,16 @@ const app = {
     viewer.camera.updateProjectionMatrix();
   },
 
-  /** Hook for derived visuals (footprints, occlusion) – replaced later. */
-  sensorChanged() {},
+  /** Recompute derived visuals (ground footprint, occlusion) on the next frame. */
+  sensorChanged(sensor) {
+    if (sensor) dirty.add(sensor);
+    else for (const s of state.sensors) dirty.add(s);
+  },
+
+  setClipBelowGround(v) {
+    fovSettings.clipBelowGround = v;
+    for (const s of state.sensors) s.rebuildFov();
+  },
 
   cardExtras(sensor) { return fovControls(sensor, app, h); },
 
@@ -134,6 +144,41 @@ const app = {
     setVisible(state.robot.bodyFrame, v);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Derived visuals, recomputed at most once per frame per sensor
+
+const dirty = new Set();
+viewer.onFrame.push(() => {
+  if (!dirty.size || !state.robot) return;
+  for (const s of dirty) updateDerived(s);
+  dirty.clear();
+});
+
+function updateDerived(s) {
+  if (!state.sensors.includes(s)) {
+    if (s.derivedGroup) { s.derivedGroup.parent?.remove(s.derivedGroup); disposeTree(s.derivedGroup); }
+    return;
+  }
+  if (!s.derivedGroup) {
+    s.derivedGroup = new THREE.Group();
+    state.overlay.add(s.derivedGroup);
+    const dispose = s.dispose.bind(s);
+    s.dispose = () => { s.derivedGroup.parent?.remove(s.derivedGroup); disposeTree(s.derivedGroup); dispose(); };
+  }
+  for (const c of [...s.derivedGroup.children]) { s.derivedGroup.remove(c); disposeTree(c); }
+  s.derived = {};
+  const visible = s.mount.visible && s.show.fov;
+  if (visible && s.show.footprint) {
+    s.derived.footprint = computeFootprint(s, state.robot, state.groundZ);
+    if (s.derived.footprint?.mesh) s.derivedGroup.add(s.derived.footprint.mesh);
+  }
+  if (visible && s.show.occlusion) {
+    s.derived.occlusion = computeOcclusion(s, state.robot);
+    if (s.derived.occlusion?.lines) s.derivedGroup.add(s.derived.occlusion.lines);
+  }
+  s.emit('derived');
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -266,6 +311,16 @@ async function loadRobot(path) {
   bodyObj.add(robot.bodyFrame);
   robot.linkFrames = makeLinkFrames(robot, Math.max(robot.bodyBounds.getSize(new THREE.Vector3()).length() * 0.04, 0.1));
   for (const f of robot.linkFrames) setVisible(f, false);
+
+  // Ground plane = lowest point of the robot visuals (wheels on the ground).
+  robot.root.updateMatrixWorld(true);
+  const visuals = new THREE.Box3();
+  robot.root.traverse((o) => { if (o.isMesh && o.userData.robotVisual) visuals.expandByObject(o); });
+  state.groundZ = visuals.isEmpty() ? 0 : visuals.min.z;
+  fovSettings.groundPlane.constant = -state.groundZ;
+  state.overlay = new THREE.Group();
+  state.overlay.name = 'overlay';
+  viewer.content.add(state.overlay);
 
   state.attachLink = robot.bodyLink;
   state.showLinkFrames = false;
