@@ -1,8 +1,9 @@
 import { Viewer } from './viewer.js';
 import { api } from './api.js';
+import { loadRobot as parseRobot } from './robotLoader.js';
 
 const viewer = new Viewer(document.getElementById('viewport'));
-const state = { robotPath: null };
+const state = { robotPath: null, robot: null };
 
 // ---- view preset buttons ---------------------------------------------------
 document.getElementById('view-buttons').addEventListener('click', (e) => {
@@ -48,9 +49,25 @@ async function openRobotPicker() {
 picker.addEventListener('cancel', (e) => { if (!state.robotPath) e.preventDefault(); });
 document.getElementById('btn-change-robot').addEventListener('click', openRobotPicker);
 
+const hud = document.getElementById('hud');
+
 async function loadRobot(path) {
+  let robot;
+  try {
+    robot = await parseRobot(path, await api.text(path));
+  } catch (err) {
+    alert(`Could not load ${path}:\n${err.message}`);
+    if (!state.robotPath) openRobotPicker();
+    return;
+  }
+  viewer.clearContent();
+  viewer.content.add(robot.root);
   state.robotPath = path;
-  document.getElementById('robot-name').textContent = path;
+  state.robot = robot;
+  document.getElementById('robot-name').textContent =
+    `${robot.name} · ${robot.links.size} links · ${path}`;
+  hud.textContent = robot.warnings.length ? `⚠ ${robot.warnings.join(' · ')}` : '';
+  for (const w of robot.warnings) console.warn(w);
   viewer.setView('iso');
 }
 
